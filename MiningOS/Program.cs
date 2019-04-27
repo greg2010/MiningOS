@@ -67,7 +67,6 @@ namespace IngameScript
             gyroController = new GyroController(getGyros(), this.Echo);
             gyroController.Schedule(new GyroController.Job(new Vector3D(-425.34d, -166.88d, 917.13d), this.mainController));
             gyroController.Schedule(new GyroController.Job(new Vector3D(-190.29, -47.17, 1049.49), this.mainController));
-            
 
             foreach (var tg in directionalThrusters)
             {
@@ -88,125 +87,6 @@ namespace IngameScript
         public void Main(string argument, UpdateType updateSource)
         {
             gyroController.Tick();
-        }
-
-
-        class GyroController
-        {
-            public struct Job
-            {
-                public Vector3D coordinates;
-                public IMyCubeBlock reference;
-                public Job(Vector3D coordinates, IMyCubeBlock reference)
-                {
-                    this.coordinates = coordinates;
-                    this.reference = reference;
-                }
-            }
-
-            public List<IMyGyro> gyroList;
-            private List<Job> jobList = new List<Job>();
-            Action<string> Echo;
-
-            public GyroController(List<IMyGyro> gyroList, Action<string> Echo)
-            {
-                this.gyroList = gyroList;
-                this.Echo = Echo;
-            }
-
-            public void Schedule(Job job)
-            {
-                jobList.Add(job);
-            }
-
-            public void Tick()
-            {
-
-                if (jobList.Count > 0)
-                {
-                    Job curJob = jobList.First();
-                    Echo($"GyroController: Found job with coords {curJob.coordinates.ToString()}");
-                    var curPosn = curJob.reference.GetPosition();
-                    Vector3D directionVec = curJob.coordinates - curPosn;
-                    double pitch, yaw = 0;
-                    VectorMath.GetRotationAngles(directionVec, curJob.reference.WorldMatrix.Forward, curJob.reference.WorldMatrix.Left, curJob.reference.WorldMatrix.Up, out yaw, out pitch);
-                    Echo($"Pitch: {pitch} Yaw: {yaw}");
-                    var originalRotVec = new Vector3D(-pitch, yaw, 0);
-                    int gyrosCompleted = 0;
-                    foreach (var gyro in gyroList)
-                    {
-                        var originalWorldRotVec = VectorMath.GetWorldDirection(originalRotVec, curJob.reference);
-                        var shiftedGyroRotVector = VectorMath.GetBodyDirection(originalWorldRotVec, gyro);
-                        float pitchRounded = (float)Math.Round(shiftedGyroRotVector.X, 2);
-                        float yawRounded = (float)Math.Round(shiftedGyroRotVector.Y, 2);
-                        float rollRounded = (float)Math.Round(shiftedGyroRotVector.Z, 2);
-
-                        Echo($"PitchSpeed: {pitchRounded} YawSpeed: {yawRounded} RollSpeed: {rollRounded}");
-                        if (pitchRounded == 0f && yawRounded == 0f && rollRounded == 0f)
-                        {
-                            gyro.GyroOverride = false;
-                            gyrosCompleted++;
-                        }
-                        else
-                        {
-                            gyro.Pitch = pitchRounded;
-                            gyro.Yaw = yawRounded;
-                            gyro.Roll = rollRounded;
-                            gyro.GyroOverride = true;
-                        }
-                    }
-                    if (gyrosCompleted == gyroList.Count)
-                    {
-                        Echo($"Job with coords {curJob.coordinates.ToString()} completed, popping");
-                        jobList.Remove(curJob);
-
-                    }
-                }
-            }
-
-        }
-
-        class PID
-        {
-            private double kP;
-            private double kI;
-            private double kD;
-
-            private double timeStep;
-
-            private double prevError;
-
-            private double cP;
-            private double cI;
-            private double cD;
-
-
-            public PID(double kP, double kI, double kD, double timeStep)
-            {
-                this.kP = kP;
-                this.kI = kI;
-                this.kD = kD;
-                this.timeStep = timeStep;
-                this.Reset();
-            }
-
-            public void Reset()
-            {
-                this.prevError = 0d;
-                this.cP = 0d;
-                this.cI = 0d;
-                this.cD = 0d;
-            }
-
-            public double Update(double error)
-            {
-                var deltaError = error - this.prevError;
-                this.cP = error;
-                this.cI = error * timeStep;
-                this.cD = timeStep != 0 ? deltaError / timeStep : 0;
-                this.prevError = error;
-                return (this.kP * this.cP) + (this.kI * this.cI) + (this.kD * this.cD);
-            }
         }
     }
 }

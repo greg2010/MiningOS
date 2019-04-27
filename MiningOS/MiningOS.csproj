@@ -35,6 +35,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="GyroController.cs" />
+    <Compile Include="PID.cs" />
     <Compile Include="VectorMath.cs" />
     <Compile Include="MDK\Bootstrapper.cs" />
     <Compile Include="Program.cs" />

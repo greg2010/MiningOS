@@ -19,57 +19,55 @@ using VRageMath;
 
 namespace IngameScript
 {
-    partial class Program
+    // Inspired by Whip's scripts
+    static class VectorMath
     {
-        // Inspired by Whip's scripts
-        public class VectorMath
+
+        public static Vector3D GetBodyDirection(Vector3D worldDirection, IMyCubeBlock reference)
         {
+            return Vector3D.TransformNormal(worldDirection, MatrixD.Transpose(reference.WorldMatrix));
+        }
 
-            public static Vector3D GetBodyDirection(Vector3D worldDirection, IMyCubeBlock reference)
+        public static Vector3D GetWorldDirection(Vector3D bodyDirection, IMyCubeBlock reference)
+        {
+            return Vector3D.TransformNormal(bodyDirection, reference.WorldMatrix);
+        }
+
+        public static void GetRotationAngles(Vector3D vTarget, Vector3D vFront, Vector3D vLeft, Vector3D vUp, out double yaw, out double pitch)
+        {
+            var projectTargetUp = VectorProjection(vTarget, vUp);
+            var projTargetFrontLeft = vTarget - projectTargetUp;
+
+            yaw = VectorAngleBetween(vFront, projTargetFrontLeft);
+            pitch = VectorAngleBetween(vTarget, projTargetFrontLeft);
+
+            //---Check if yaw angle is left or right   
+            //multiplied by -1 to convert from right hand rule to left hand rule 
+            yaw = -1 * Math.Sign(vLeft.Dot(vTarget)) * yaw;
+
+            //---Check if pitch angle is up or down     
+            pitch = Math.Sign(vUp.Dot(vTarget)) * pitch;
+
+            //---Check if target vector is pointing opposite the front vector 
+            if (pitch == 0 && yaw == 0 && vTarget.Dot(vFront) < 0)
             {
-                return Vector3D.TransformNormal(worldDirection, MatrixD.Transpose(reference.WorldMatrix));
+                yaw = Math.PI;
             }
+        }
 
-            public static Vector3D GetWorldDirection(Vector3D bodyDirection, IMyCubeBlock reference)
-            {
-                return Vector3D.TransformNormal(bodyDirection, reference.WorldMatrix);
-            }
+        public static Vector3D VectorProjection(Vector3D a, Vector3D b) //proj a onto b    
+        {
+            Vector3D projection = a.Dot(b) / b.LengthSquared() * b;
+            return projection;
+        }
 
-            public static void GetRotationAngles(Vector3D vTarget, Vector3D vFront, Vector3D vLeft, Vector3D vUp, out double yaw, out double pitch)
-            {
-                var projectTargetUp = VectorProjection(vTarget, vUp);
-                var projTargetFrontLeft = vTarget - projectTargetUp;
-
-                yaw = VectorAngleBetween(vFront, projTargetFrontLeft);
-                pitch = VectorAngleBetween(vTarget, projTargetFrontLeft);
-
-                //---Check if yaw angle is left or right   
-                //multiplied by -1 to convert from right hand rule to left hand rule 
-                yaw = -1 * Math.Sign(vLeft.Dot(vTarget)) * yaw;
-
-                //---Check if pitch angle is up or down     
-                pitch = Math.Sign(vUp.Dot(vTarget)) * pitch;
-
-                //---Check if target vector is pointing opposite the front vector 
-                if (pitch == 0 && yaw == 0 && vTarget.Dot(vFront) < 0)
-                {
-                    yaw = Math.PI;
-                }
-            }
-
-            public static Vector3D VectorProjection(Vector3D a, Vector3D b) //proj a onto b    
-            {
-                Vector3D projection = a.Dot(b) / b.LengthSquared() * b;
-                return projection;
-            }
-
-            public static double VectorAngleBetween(Vector3D a, Vector3D b) //returns radians  
-            {
-                if (a.LengthSquared() == 0 || b.LengthSquared() == 0)
-                    return 0;
-                else
-                    return Math.Acos(MathHelper.Clamp(a.Dot(b) / a.Length() / b.Length(), -1, 1));
-            }
+        public static double VectorAngleBetween(Vector3D a, Vector3D b) //returns radians  
+        {
+            if (a.LengthSquared() == 0 || b.LengthSquared() == 0)
+                return 0;
+            else
+                return Math.Acos(MathHelper.Clamp(a.Dot(b) / a.Length() / b.Length(), -1, 1));
         }
     }
 }
+
