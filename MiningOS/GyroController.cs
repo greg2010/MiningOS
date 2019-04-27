@@ -19,20 +19,22 @@ namespace IngameScript
 {
     class GyroController
     {
-        public struct Job
+
+        public class ShipOrientation
         {
             public Vector3D coordinates;
             public IMyCubeBlock reference;
-            public Job(Vector3D coordinates, IMyCubeBlock reference)
+
+            public ShipOrientation(Vector3D coordinates, IMyCubeBlock reference)
             {
                 this.coordinates = coordinates;
                 this.reference = reference;
             }
         }
 
-        public List<IMyGyro> gyroList;
-        private List<Job> jobList = new List<Job>();
+        private List<IMyGyro> gyroList;
         readonly Action<string> Echo;
+        public ShipOrientation shipOrientation;
 
         public GyroController(List<IMyGyro> gyroList, Action<string> Echo)
         {
@@ -40,54 +42,59 @@ namespace IngameScript
             this.Echo = Echo;
         }
 
-        public void Schedule(Job job)
+        public void EnableOverride()
         {
-            jobList.Add(job);
+            foreach (var gyro in gyroList)
+            {
+                gyro.GyroOverride = true;
+            }
+        }
+
+
+        public void DisableOverride()
+        {
+            foreach (var gyro in gyroList)
+            {
+                gyro.GyroOverride = false;
+            }
+        }
+
+        private bool ApplyRotation(Vector3D coordinates, IMyCubeBlock reference)
+        {
+            Vector3D curPosn = reference.GetPosition();
+            Vector3D directionVec = coordinates - curPosn;
+            double pitch, yaw = 0;
+            VectorMath.GetRotationAngles(directionVec, reference.WorldMatrix.Forward, reference.WorldMatrix.Left, reference.WorldMatrix.Up, out yaw, out pitch);
+            Vector3D originalRotVec = new Vector3D(-pitch, yaw, 0);
+            Vector3D originalWorldRotVec = VectorMath.GetWorldDirection(originalRotVec, reference);
+            int gyrosCompleted = 0;
+            foreach (var gyro in gyroList)
+            {
+                Vector3D shiftedGyroRotVector = VectorMath.GetBodyDirection(originalWorldRotVec, gyro);
+                float pitchRounded = (float)Math.Round(shiftedGyroRotVector.X, 2);
+                float yawRounded = (float)Math.Round(shiftedGyroRotVector.Y, 2);
+                float rollRounded = (float)Math.Round(shiftedGyroRotVector.Z, 2);
+                
+                if (pitchRounded == 0f && yawRounded == 0f && rollRounded == 0f) ++gyrosCompleted;
+                gyro.Pitch = pitchRounded;
+                gyro.Yaw = yawRounded;
+                gyro.Roll = rollRounded;
+            }
+
+            return gyrosCompleted == gyroList.Count;
         }
 
         public void Tick()
         {
-
-            if (jobList.Count > 0)
+            if (shipOrientation != null)
             {
-                Job curJob = jobList.First();
-                Echo($"GyroController: Found job with coords {curJob.coordinates.ToString()}");
-                var curPosn = curJob.reference.GetPosition();
-                Vector3D directionVec = curJob.coordinates - curPosn;
-                double pitch, yaw = 0;
-                VectorMath.GetRotationAngles(directionVec, curJob.reference.WorldMatrix.Forward, curJob.reference.WorldMatrix.Left, curJob.reference.WorldMatrix.Up, out yaw, out pitch);
-                Echo($"Pitch: {pitch} Yaw: {yaw}");
-                var originalRotVec = new Vector3D(-pitch, yaw, 0);
-                int gyrosCompleted = 0;
-                foreach (var gyro in gyroList)
-                {
-                    var originalWorldRotVec = VectorMath.GetWorldDirection(originalRotVec, curJob.reference);
-                    var shiftedGyroRotVector = VectorMath.GetBodyDirection(originalWorldRotVec, gyro);
-                    float pitchRounded = (float)Math.Round(shiftedGyroRotVector.X, 2);
-                    float yawRounded = (float)Math.Round(shiftedGyroRotVector.Y, 2);
-                    float rollRounded = (float)Math.Round(shiftedGyroRotVector.Z, 2);
-
-                    Echo($"PitchSpeed: {pitchRounded} YawSpeed: {yawRounded} RollSpeed: {rollRounded}");
-                    if (pitchRounded == 0f && yawRounded == 0f && rollRounded == 0f)
-                    {
-                        gyro.GyroOverride = false;
-                        gyrosCompleted++;
-                    }
-                    else
-                    {
-                        gyro.Pitch = pitchRounded;
-                        gyro.Yaw = yawRounded;
-                        gyro.Roll = rollRounded;
-                        gyro.GyroOverride = true;
-                    }
-                }
-                if (gyrosCompleted == gyroList.Count)
-                {
-                    Echo($"Job with coords {curJob.coordinates.ToString()} completed, popping");
-                    jobList.Remove(curJob);
-
-                }
+                this.EnableOverride();
+                ApplyRotation(shipOrientation.coordinates, shipOrientation.reference);
+            } else
+            {
+                this.DisableOverride();
             }
+
         }
     }
 }

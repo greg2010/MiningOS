@@ -62,11 +62,13 @@ namespace IngameScript
 
         public Program()
         {
+             
+
             mainController = getMainController();
             directionalThrusters = getDirectionalThrusters(mainController);
             gyroController = new GyroController(getGyros(), this.Echo);
-            gyroController.Schedule(new GyroController.Job(new Vector3D(-425.34d, -166.88d, 917.13d), this.mainController));
-            gyroController.Schedule(new GyroController.Job(new Vector3D(-190.29, -47.17, 1049.49), this.mainController));
+            gyroController.shipOrientation = new GyroController.ShipOrientation(new Vector3D (-425.34d, -166.88d, 917.13d), this.mainController);
+            //gyroController.Schedule(new GyroController.Job(new Vector3D(-190.29, -47.17, 1049.49), this.mainController));
 
             foreach (var tg in directionalThrusters)
             {
