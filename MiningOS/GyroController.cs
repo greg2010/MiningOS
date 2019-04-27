@@ -32,14 +32,25 @@ namespace IngameScript
             }
         }
 
+        public Vector3D Error { get; private set; }
+
         private List<IMyGyro> gyroList;
+
+        readonly private PID PitchPID;
+        readonly private PID YawPID;
+        readonly private PID RollPID;
+
         readonly Action<string> Echo;
         public ShipOrientation shipOrientation;
 
-        public GyroController(List<IMyGyro> gyroList, Action<string> Echo)
+        public GyroController(List<IMyGyro> gyroList, Action<string> Echo, double kP, double kI, double kD, double timeStep)
         {
             this.gyroList = gyroList;
             this.Echo = Echo;
+
+            this.PitchPID = new PID(kP, kI, kD, timeStep);
+            this.YawPID = new PID(kP, kI, kD, timeStep);
+            this.RollPID = new PID(kP, kI, kD, timeStep);
         }
 
         public void EnableOverride()
@@ -65,7 +76,11 @@ namespace IngameScript
             Vector3D directionVec = coordinates - curPosn;
             double pitch, yaw = 0;
             VectorMath.GetRotationAngles(directionVec, reference.WorldMatrix.Forward, reference.WorldMatrix.Left, reference.WorldMatrix.Up, out yaw, out pitch);
-            Vector3D originalRotVec = new Vector3D(-pitch, yaw, 0);
+            Error = new Vector3D(-pitch, yaw, 0);
+            Vector3D originalRotVec = new Vector3D(PitchPID.Update(-pitch), YawPID.Update(yaw), RollPID.Update(0));
+            Echo($"Error: {-pitch} {yaw} {0}");
+            Echo($"PID Response: {originalRotVec.X} {originalRotVec.Y} {originalRotVec.Z}");
+            Echo($"PID - error: {originalRotVec.X - -pitch} {originalRotVec.Y - yaw} {originalRotVec.Z - 0}");
             Vector3D originalWorldRotVec = VectorMath.GetWorldDirection(originalRotVec, reference);
             int gyrosCompleted = 0;
             foreach (var gyro in gyroList)
@@ -93,6 +108,7 @@ namespace IngameScript
             } else
             {
                 this.DisableOverride();
+
             }
 
         }

@@ -19,11 +19,22 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
+
+        /*  
+         * Gyro PID constants
+         */
+
+        static double kP = 2d;
+        static double kI = 0.1d;
+        static double kD = 0.425d;
+        double timeStep = 1 / 10d;
+
+
         private IMyRemoteControl mainController = null;
         private Dictionary<Base6Directions.Direction, List<IMyThrust>> directionalThrusters = null;
         private GyroController gyroController = null;
 
-        private IMyRemoteControl getMainController()
+        private IMyRemoteControl GetMainController()
         {
             var controllers = new List<IMyRemoteControl>();
             GridTerminalSystem.GetBlocksOfType<IMyRemoteControl>(controllers);
@@ -36,7 +47,7 @@ namespace IngameScript
             return controllers[0];
         }
 
-        private Dictionary<Base6Directions.Direction, List<IMyThrust>> getDirectionalThrusters(IMyCubeBlock reference)
+        private Dictionary<Base6Directions.Direction, List<IMyThrust>> GetDirectionalThrusters(IMyCubeBlock reference)
         {
             Dictionary<Base6Directions.Direction, List<IMyThrust>> thrustersDict = new Dictionary<Base6Directions.Direction, List<IMyThrust>>();
             List<IMyThrust> thrusters = new List<IMyThrust>();
@@ -53,7 +64,7 @@ namespace IngameScript
             return thrustersDict;
         }
 
-        private List<IMyGyro> getGyros()
+        private List<IMyGyro> GetGyros()
         {
             List<IMyGyro> gyroList = new List<IMyGyro>();
             GridTerminalSystem.GetBlocksOfType<IMyGyro>(gyroList);
@@ -64,9 +75,9 @@ namespace IngameScript
         {
              
 
-            mainController = getMainController();
-            directionalThrusters = getDirectionalThrusters(mainController);
-            gyroController = new GyroController(getGyros(), this.Echo);
+            mainController = GetMainController();
+            directionalThrusters = GetDirectionalThrusters(mainController);
+            gyroController = new GyroController(GetGyros(), this.Echo, kP, kI, kD, timeStep);
             gyroController.shipOrientation = new GyroController.ShipOrientation(new Vector3D (-425.34d, -166.88d, 917.13d), this.mainController);
             //gyroController.Schedule(new GyroController.Job(new Vector3D(-190.29, -47.17, 1049.49), this.mainController));
 
