@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.489
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MiningOS", "MiningOS\MiningOS.csproj", "{9ABF34AE-20EF-43C0-A97C-A1611CE134BE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9ABF34AE-20EF-43C0-A97C-A1611CE134BE}.Debug|x64.ActiveCfg = Debug|x64
+		{9ABF34AE-20EF-43C0-A97C-A1611CE134BE}.Debug|x64.Build.0 = Debug|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C06479CE-8583-4D24-9D0E-807F38B5A845}
+	EndGlobalSection
+EndGlobal
