@@ -35,6 +35,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="EngineController.cs" />
     <Compile Include="GyroController.cs" />
     <Compile Include="PID.cs" />
     <Compile Include="VectorMath.cs" />

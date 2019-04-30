@@ -32,8 +32,6 @@ namespace IngameScript
             }
         }
 
-        public Vector3D Error { get; private set; }
-
         private List<IMyGyro> gyroList;
 
         readonly private PID PitchPID;
@@ -76,7 +74,7 @@ namespace IngameScript
             Vector3D directionVec = coordinates - curPosn;
             double pitch, yaw = 0;
             VectorMath.GetRotationAngles(directionVec, reference.WorldMatrix.Forward, reference.WorldMatrix.Left, reference.WorldMatrix.Up, out yaw, out pitch);
-            Error = new Vector3D(-pitch, yaw, 0);
+
             Vector3D originalRotVec = new Vector3D(PitchPID.Update(-pitch), YawPID.Update(yaw), RollPID.Update(0));
             Echo($"Error: {-pitch} {yaw} {0}");
             Echo($"PID Response: {originalRotVec.X} {originalRotVec.Y} {originalRotVec.Z}");

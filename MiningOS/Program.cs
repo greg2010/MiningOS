@@ -24,15 +24,24 @@ namespace IngameScript
          * Gyro PID constants
          */
 
-        static double kP = 2d;
-        static double kI = 0.1d;
-        static double kD = 0.425d;
+        static double gyrokP = 2d;
+        static double gyrokI = 0.1d;
+        static double gyrokD = 0.425d;
+
+        /*
+         * Engine PID constants 
+         */
+
+        static double enginekP = 3d;
+        static double enginekI = 0.1d;
+        static double enginekD = 1d;
+
+
         double timeStep = 1 / 10d;
-
-
         private IMyRemoteControl mainController = null;
         private Dictionary<Base6Directions.Direction, List<IMyThrust>> directionalThrusters = null;
         private GyroController gyroController = null;
+        private EngineController engineController = null;
 
         private IMyRemoteControl GetMainController()
         {
@@ -71,14 +80,24 @@ namespace IngameScript
             return gyroList;
         }
 
+        private List<IMyThrust> GetThrusters()
+        {
+            List<IMyThrust> thrusterList = new List<IMyThrust>();
+            GridTerminalSystem.GetBlocksOfType<IMyThrust>(thrusterList);
+            return thrusterList;
+        }
+
         public Program()
         {
              
 
             mainController = GetMainController();
             directionalThrusters = GetDirectionalThrusters(mainController);
-            gyroController = new GyroController(GetGyros(), this.Echo, kP, kI, kD, timeStep);
-            gyroController.shipOrientation = new GyroController.ShipOrientation(new Vector3D (-425.34d, -166.88d, 917.13d), this.mainController);
+            //gyroController = new GyroController(GetGyros(), this.Echo, kP, kI, kD, timeStep);
+            //gyroController.shipOrientation = new GyroController.ShipOrientation(new Vector3D (-425.34d, -166.88d, 917.13d), this.mainController);
+
+            engineController = new EngineController(GetThrusters(), this.Echo, mainController, enginekP, enginekI, enginekD, timeStep);
+            engineController.shipDestination = new EngineController.ShipDestination(new Vector3D(-425.34d, -166.88d, 917.13d), this.mainController, 10);
             //gyroController.Schedule(new GyroController.Job(new Vector3D(-190.29, -47.17, 1049.49), this.mainController));
 
             foreach (var tg in directionalThrusters)
@@ -99,7 +118,8 @@ namespace IngameScript
 
         public void Main(string argument, UpdateType updateSource)
         {
-            gyroController.Tick();
+            //gyroController.Tick();
+            engineController.Tick();
         }
     }
 }
