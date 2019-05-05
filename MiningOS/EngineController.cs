@@ -99,7 +99,23 @@ namespace IngameScript
             }
         }
 
-        private Dictionary<Base6Directions.Direction, double> CalculateDirectionalDistance(Vector3D directionVector)
+        private double GetMaxThrustInDirection(IMyCubeBlock reference, Base6Directions.Direction direction)
+        {
+            var thrusters = GetDirectionalThrusters(reference)[direction];
+            return thrusters.Aggregate(0f, (acc, thruster) =>
+            {
+                return acc + thruster.MaxEffectiveThrust;
+            });
+        }
+
+        private double MaxAccelerationInDirection(IMyCubeBlock reference, IMyRemoteControl mainController, Base6Directions.Direction direction)
+        {
+            var mass = mainController.CalculateShipMass().PhysicalMass;
+
+            return GetMaxThrustInDirection(reference, direction) / mass;
+        }
+
+        private Dictionary<Base6Directions.Direction, double> ProjectVectorOntoDirections(Vector3D directionVector)
         {
 
             Dictionary<Base6Directions.Direction, double> distanceDict = new Dictionary<Base6Directions.Direction, double>();
@@ -116,25 +132,31 @@ namespace IngameScript
                 if (dirVector.Value.Dot(proj) < 0)
                 {
                     distanceDict.Add(Base6Directions.GetFlippedDirection(dirVector.Key), projLen);
+                    distanceDict.Add(dirVector.Key, 0);
                 }
                 else
                 {
                     distanceDict.Add(dirVector.Key, projLen);
+                    distanceDict.Add(Base6Directions.GetFlippedDirection(dirVector.Key), 0);
                 }
             }
 
             return distanceDict;
         }
 
-        // INVARIANT: accDict must not contain opposite directions
-        private Dictionary<Base6Directions.Direction, double> GetZeroAccelerationVectors(Dictionary<Base6Directions.Direction, double> accDict)
+        private double GenerateTargetVelocity(double curVelocity, double distanceToTarget, double reverseAcceleration, double maxSpeed, Base6Directions.Direction direction)
         {
-            Dictionary<Base6Directions.Direction, double> zeroedAccDict = new Dictionary<Base6Directions.Direction, double>();
-            foreach (var acc in accDict)
+
+            double distanceToStop = (-curVelocity * -curVelocity) / (2 * reverseAcceleration);
+            if (distanceToTarget <= 0.1d) return 0;
+            if (direction == Base6Directions.Direction.Forward) Echo($"distanceToTarget: {Math.Round(distanceToTarget, 2)} reverseAcceleration: {Math.Round(reverseAcceleration, 2)}, distanceToStop: {Math.Round(distanceToStop, 2)}");
+            if (distanceToStop/* + 0.1d * curVelocity + 0.01d * distanceToTarget*/ < distanceToTarget)
             {
-                zeroedAccDict.Add(Base6Directions.GetFlippedDirection(acc.Key), 0);
+                return Math.Min(distanceToTarget, maxSpeed);
+            } else
+            {
+                return 0;
             }
-            return zeroedAccDict;
         }
 
         public void KillThrust()
@@ -151,20 +173,26 @@ namespace IngameScript
             {
                 Vector3D curPosn = shipDestination.reference.GetPosition();
                 Vector3D directionVector = shipDestination.coordinates - curPosn;
-                Dictionary<Base6Directions.Direction, double> directionalDistance = CalculateDirectionalDistance(directionVector);
+
+                Dictionary<Base6Directions.Direction, double> directionalDistance = ProjectVectorOntoDirections(directionVector);
+                Dictionary<Base6Directions.Direction, double> directionalVelocity = ProjectVectorOntoDirections(mainController.GetShipVelocities().LinearVelocity);
                 Echo("Applying PID control...");
 
-                // Apply thrust
-                foreach (var dirThrust in directionalDistance)
+                foreach (var direction in directionalDistance.Keys)
                 {
-                    var pid = this.GetDirectionalPID(dirThrust.Key);
-                    var thrust = pid.Update(dirThrust.Value);
-                    Echo($"Direction: {dirThrust.Key.ToString()} Distance: {Math.Round(dirThrust.Value, 2)}m Thrust: {Math.Round(thrust, 2)}%");
-                    this.ApplySpeedInDirection(dirThrust.Key, shipDestination.reference, (float)thrust);
-                }
-                foreach (var dirThrust in this.GetZeroAccelerationVectors(directionalDistance))
-                {
-                    this.ApplySpeedInDirection(dirThrust.Key, shipDestination.reference, 0);
+                    double curDirectionalVelocity = directionalVelocity[direction];
+                    double curDirectionalDistance = directionalDistance[direction];
+
+                    double reverseAcceleration = this.MaxAccelerationInDirection(shipDestination.reference, mainController, Base6Directions.GetFlippedDirection(direction));
+
+                    double expectedVelocity = this.GenerateTargetVelocity(curDirectionalVelocity, curDirectionalDistance, reverseAcceleration, 1000, direction);
+                    double error = expectedVelocity - curDirectionalVelocity;
+
+                    var pid = this.GetDirectionalPID(direction);
+                    var thrust = pid.Update(error);
+                    //Echo($"Direction: {direction.ToString()} error: {error} PID Correction: {thrust}");
+                    //Echo($"Direction: {direction.ToString()} Distance: {Math.Round(curDirectionalDistance, 2)}m Thrust: {Math.Round(thrust, 2)}%");
+                    this.ApplySpeedInDirection(direction, shipDestination.reference, (float) thrust);
                 }
             }
         }

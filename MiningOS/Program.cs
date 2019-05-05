@@ -32,12 +32,12 @@ namespace IngameScript
          * Engine PID constants 
          */
 
-        static double enginekP = 3d;
+        static double enginekP = 1d;
         static double enginekI = 0.1d;
-        static double enginekD = 1d;
+        static double enginekD = 0.1d;
 
 
-        double timeStep = 1 / 10d;
+        double timeStep = 1 / 100d;
         private IMyRemoteControl mainController = null;
         private Dictionary<Base6Directions.Direction, List<IMyThrust>> directionalThrusters = null;
         private GyroController gyroController = null;
@@ -104,7 +104,7 @@ namespace IngameScript
             {
                 Echo($"Direction: {tg.Key} count: {tg.Value.Count} ");
             }
-            Runtime.UpdateFrequency = UpdateFrequency.Update10;
+            Runtime.UpdateFrequency = UpdateFrequency.Update1;
         }
 
 
