@@ -20,7 +20,7 @@ namespace IngameScript
     class EngineController
     {
 
-        readonly Action<string> Echo;
+        readonly private Action<string> Echo;
         private List<IMyThrust> thrusterList;
         readonly private IMyRemoteControl mainController;
 
@@ -28,21 +28,19 @@ namespace IngameScript
         readonly private PID LeftRightPID;
         readonly private PID ForwardBackwardPID;
 
-        public class ShipDestination
+        public class ShipWorldWaypoint
         {
-            public Vector3D coordinates;
-            public IMyCubeBlock reference;
-            public double desiredDistance;
+            readonly public Vector3D coordinates;
+            readonly public IMyCubeBlock reference;
+            readonly public double maxSpeed;
 
-            public ShipDestination(Vector3D coordinates, IMyCubeBlock reference, double desiredDistance)
+            public ShipWorldWaypoint(Vector3D coordinates, IMyCubeBlock reference, double maxSpeed)
             {
                 this.coordinates = coordinates;
                 this.reference = reference;
-                this.desiredDistance = desiredDistance;
+                this.maxSpeed = maxSpeed;
             }
         }
-
-        public ShipDestination shipDestination;
 
         public EngineController(List<IMyThrust> thrusterList, Action<string> Echo, IMyRemoteControl mainController, double kP, double kI, double kD, double timeStep)
         {
@@ -94,7 +92,6 @@ namespace IngameScript
             foreach (var thruster in dirThrusters)
             {
                 float clampedThrust = MathHelper.Clamp(percent, 0, 100);
-                //Echo($"Applying thrust of {clampedThrust}% in {direction.ToString()} direction");
                 thruster.ThrustOverridePercentage = clampedThrust;
             }
         }
@@ -115,16 +112,15 @@ namespace IngameScript
             return GetMaxThrustInDirection(reference, direction) / mass;
         }
 
-        private Dictionary<Base6Directions.Direction, double> ProjectVectorOntoDirections(Vector3D directionVector)
+        private Dictionary<Base6Directions.Direction, double> ProjectVectorOntoDirections(Vector3D directionVector, ShipWorldWaypoint shipWorldWaypoint)
         {
-
             Dictionary<Base6Directions.Direction, double> distanceDict = new Dictionary<Base6Directions.Direction, double>();
 
             foreach (var dirVector in new Dictionary<Base6Directions.Direction, Vector3D>
                 {
-                    { Base6Directions.Direction.Up, shipDestination.reference.WorldMatrix.Up },
-                    { Base6Directions.Direction.Left, shipDestination.reference.WorldMatrix.Left },
-                    { Base6Directions.Direction.Forward, shipDestination.reference.WorldMatrix.Forward },
+                    { Base6Directions.Direction.Up, shipWorldWaypoint.reference.WorldMatrix.Up },
+                    { Base6Directions.Direction.Left, shipWorldWaypoint.reference.WorldMatrix.Left },
+                    { Base6Directions.Direction.Forward, shipWorldWaypoint.reference.WorldMatrix.Forward },
                 })
             {
                 Vector3D proj = VectorMath.VectorProjection(directionVector, dirVector.Value);
@@ -144,15 +140,20 @@ namespace IngameScript
             return distanceDict;
         }
 
-        private double GenerateTargetVelocity(double curVelocity, double distanceToTarget, double reverseAcceleration, double maxSpeed, Base6Directions.Direction direction)
+        public Vector3D GetDirectionVector(ShipWorldWaypoint shipWorldWaypoint)
+        {
+            return shipWorldWaypoint.coordinates - shipWorldWaypoint.reference.GetPosition();
+
+        }
+
+        private double GenerateTargetVelocity(double curVelocity, double distanceToTarget, double reverseAcceleration, double maxSpeed)
         {
 
-            double distanceToStop = (-curVelocity * -curVelocity) / (2 * reverseAcceleration);
             if (distanceToTarget <= 0.1d) return 0;
-            if (direction == Base6Directions.Direction.Forward) Echo($"distanceToTarget: {Math.Round(distanceToTarget, 2)} reverseAcceleration: {Math.Round(reverseAcceleration, 2)}, distanceToStop: {Math.Round(distanceToStop, 2)}");
-            if (distanceToStop/* + 0.1d * curVelocity + 0.01d * distanceToTarget*/ < distanceToTarget)
+            double distanceToStop = Math.Pow(curVelocity, 2) / (2 * reverseAcceleration);
+            if (distanceToStop + 0.01d * curVelocity + 0.01d * distanceToTarget < distanceToTarget)
             {
-                return Math.Min(distanceToTarget, maxSpeed);
+                return maxSpeed;
             } else
             {
                 return 0;
@@ -167,33 +168,32 @@ namespace IngameScript
             }
         }
 
-        public void Tick()
+        public void Tick(ShipWorldWaypoint shipWorldWaypoint)
         {
-            if (shipDestination != null)
+            if (shipWorldWaypoint != null)
             {
-                Vector3D curPosn = shipDestination.reference.GetPosition();
-                Vector3D directionVector = shipDestination.coordinates - curPosn;
+                Vector3D curPosn = shipWorldWaypoint.reference.GetPosition();
+                Vector3D directionVector = this.GetDirectionVector(shipWorldWaypoint);
 
-                Dictionary<Base6Directions.Direction, double> directionalDistance = ProjectVectorOntoDirections(directionVector);
-                Dictionary<Base6Directions.Direction, double> directionalVelocity = ProjectVectorOntoDirections(mainController.GetShipVelocities().LinearVelocity);
-                Echo("Applying PID control...");
+                Dictionary<Base6Directions.Direction, double> directionalDistance = this.ProjectVectorOntoDirections(directionVector, shipWorldWaypoint);
+                Dictionary<Base6Directions.Direction, double> directionalVelocity = this.ProjectVectorOntoDirections(mainController.GetShipVelocities().LinearVelocity, shipWorldWaypoint);
 
                 foreach (var direction in directionalDistance.Keys)
                 {
                     double curDirectionalVelocity = directionalVelocity[direction];
                     double curDirectionalDistance = directionalDistance[direction];
 
-                    double reverseAcceleration = this.MaxAccelerationInDirection(shipDestination.reference, mainController, Base6Directions.GetFlippedDirection(direction));
+                    double reverseAcceleration = this.MaxAccelerationInDirection(shipWorldWaypoint.reference, mainController, Base6Directions.GetFlippedDirection(direction));
 
-                    double expectedVelocity = this.GenerateTargetVelocity(curDirectionalVelocity, curDirectionalDistance, reverseAcceleration, 1000, direction);
+                    double expectedVelocity = this.GenerateTargetVelocity(curDirectionalVelocity, curDirectionalDistance, reverseAcceleration, shipWorldWaypoint.maxSpeed);
                     double error = expectedVelocity - curDirectionalVelocity;
 
                     var pid = this.GetDirectionalPID(direction);
                     var thrust = pid.Update(error);
-                    //Echo($"Direction: {direction.ToString()} error: {error} PID Correction: {thrust}");
-                    //Echo($"Direction: {direction.ToString()} Distance: {Math.Round(curDirectionalDistance, 2)}m Thrust: {Math.Round(thrust, 2)}%");
-                    this.ApplySpeedInDirection(direction, shipDestination.reference, (float) thrust);
+                    this.ApplySpeedInDirection(direction, shipWorldWaypoint.reference, (float) thrust);
                 }
+            } else {
+                this.KillThrust();
             }
         }
     }

@@ -35,6 +35,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Logger.cs" />
+    <Compile Include="RouteController.cs" />
     <Compile Include="EngineController.cs" />
     <Compile Include="GyroController.cs" />
     <Compile Include="PID.cs" />

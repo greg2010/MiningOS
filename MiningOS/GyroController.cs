@@ -39,7 +39,6 @@ namespace IngameScript
         readonly private PID RollPID;
 
         readonly Action<string> Echo;
-        public ShipOrientation shipOrientation;
 
         public GyroController(List<IMyGyro> gyroList, Action<string> Echo, double kP, double kI, double kD, double timeStep)
         {
@@ -68,18 +67,20 @@ namespace IngameScript
             }
         }
 
-        private bool ApplyRotation(Vector3D coordinates, IMyCubeBlock reference)
+        public void GetRotationAngle(ShipOrientation shipOrientation, out double pitch, out double yaw)
         {
-            Vector3D curPosn = reference.GetPosition();
-            Vector3D directionVec = coordinates - curPosn;
-            double pitch, yaw = 0;
-            VectorMath.GetRotationAngles(directionVec, reference.WorldMatrix.Forward, reference.WorldMatrix.Left, reference.WorldMatrix.Up, out yaw, out pitch);
+            Vector3D curPosn = shipOrientation.reference.GetPosition();
+            Vector3D directionVec = shipOrientation.coordinates - curPosn;
+            VectorMath.GetRotationAngles(directionVec, shipOrientation.reference.WorldMatrix.Forward, shipOrientation.reference.WorldMatrix.Left, shipOrientation.reference.WorldMatrix.Up, out yaw, out pitch);
+        }
+
+        private bool ApplyRotation(ShipOrientation shipOrientation)
+        {
+            double pitch = 0, yaw = 0;
+            this.GetRotationAngle(shipOrientation, out pitch, out yaw);
 
             Vector3D originalRotVec = new Vector3D(PitchPID.Update(-pitch), YawPID.Update(yaw), RollPID.Update(0));
-            Echo($"Error: {-pitch} {yaw} {0}");
-            Echo($"PID Response: {originalRotVec.X} {originalRotVec.Y} {originalRotVec.Z}");
-            Echo($"PID - error: {originalRotVec.X - -pitch} {originalRotVec.Y - yaw} {originalRotVec.Z - 0}");
-            Vector3D originalWorldRotVec = VectorMath.GetWorldDirection(originalRotVec, reference);
+            Vector3D originalWorldRotVec = VectorMath.GetWorldDirection(originalRotVec, shipOrientation.reference);
             int gyrosCompleted = 0;
             foreach (var gyro in gyroList)
             {
@@ -97,12 +98,12 @@ namespace IngameScript
             return gyrosCompleted == gyroList.Count;
         }
 
-        public void Tick()
+        public void Tick(ShipOrientation shipOrientation)
         {
             if (shipOrientation != null)
             {
                 this.EnableOverride();
-                ApplyRotation(shipOrientation.coordinates, shipOrientation.reference);
+                ApplyRotation(shipOrientation);
             } else
             {
                 this.DisableOverride();
